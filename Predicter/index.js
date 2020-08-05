@@ -6,6 +6,7 @@ const IfUDAtXHoursAndSellAtXLossOrXProfit = require('./models/IfUDAtXHoursAndSel
 const BuyIfPreviousDayClimbedOrDroppedMoreThanXPercentAndSellAtXLossOrXProfit = require('./models/BuyIfPreviousDayClimbedOrDroppedMoreThanXPercentAndSellAtXLossOrXProfit');
 const LogDailyProfits = require('./models/LogDailyProfits');
 const LogHourlyProfits = require('./models/LogHourlyProfits');
+const BuyMondaySellFriday = require('./models/BuyMondaySellFriday');
 //endregion
 
 //region BuyIfPreviousDayWasHigherOrLowerAndSellTheNextDay
@@ -157,7 +158,11 @@ const LogHourlyProfits = require('./models/LogHourlyProfits');
 //endregion
 
 //region LogHourlyProfits
-    LogHourlyProfits();
+    // LogHourlyProfits();
+//endregion
+
+//region BuyMondaySellFriday
+    BuyMondaySellFriday();
 //endregion
 
 // TRY THESE

@@ -1,3 +1,4 @@
+import os
 import pprint
 pprint = pprint.PrettyPrinter().pprint
 import json
@@ -5,25 +6,23 @@ import matplotlib.pyplot as plt
 
 ##################### GET THE DATA INTO VARIABLES #####################
  
-stocks = [
-    'TSLA',
-    'AAPL',
-    'ETSY',
-    'NFLX',
-    'PINS',
-    'SPOT',
-    'TSLA',
-    'UBER',
-    'U',
-    'WIX',
-    'ZM'
-]
-
+stocks = []
 data = {}
-root_folder = __file__.replace('/index.py', '')
-for stock in stocks:
+root_folder = os.path.dirname(__file__)
+TIME_SERIES_DAILY_folder = os.path.join(root_folder, 'data', 'TIME_SERIES_DAILY')
+for file in os.listdir(TIME_SERIES_DAILY_folder):
+    file_path = os.path.join(TIME_SERIES_DAILY_folder, file)
+    stock = file.replace('.json', '')
+
+    # Test only certain stocks
+    if stock != 'TSLA':
+        continue
+        pass
+
+    stocks.append(stock)
+
     # Get the data
-    with open(f'{root_folder}/data/TIME_SERIES_DAILY/{stock}.json') as json_file:
+    with open(file_path) as json_file:
         file_data = json.load(json_file)
 
     data[stock] = file_data['Time Series (Daily)']
@@ -31,22 +30,38 @@ for stock in stocks:
     for date in data[stock]:
         data[stock][date] = data[stock][date]['4. close']
 
-    # Reverse the dates order
-    # data[stock] = dict(sorted(data[stock].items(), key=lambda x: x[1], reverse=True))
+# Prepare the graph data object
+graph_data = {}
+for stock in stocks:
+    graph_data[stock] = {}
 
-##################### RUN THE TESTS #####################
+############################################ RUN THE TESTS ############################################
 
-pprint(data)
+# Buy at the start of each month
+# start_date = '2021-01-01'
+# for stock in data:
+#     month = '01'
+#     for date in reversed(data[stock]):
+#         if date > start_date:
+#             if month != date[5:7]:
+#                 graph_data[stock][date] = data[stock][date]
+#                 month = date[5:7]
 
-##################### GRAPH THE RESULTS #####################
-
+# Graph all daily values
+start_date = '2021-04-01'
 for stock in data:
+    for date in data[stock]:
+        if date > start_date:
+            graph_data[stock][date] = data[stock][date]
+
+########################################## GRAPH THE RESULTS ##########################################
+
+for stock in graph_data:
     x_values = []
     y_values = []
-    for date in reversed(data[stock]): # You need to use reversed here since the dates are in the wrong order
-        if date > '2021-01-01':
-            x_values.append(date)
-            y_values.append(int(data[stock][date].split('.')[0]))
+    for date in reversed(graph_data[stock]): # You need to use reversed here since the dates are in the wrong order
+        x_values.append(date)
+        y_values.append(int(graph_data[stock][date].split('.')[0]))
 
     plt.plot(x_values, y_values, label=stock)
 

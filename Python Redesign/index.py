@@ -20,48 +20,82 @@ SHOW_GRAPHS = True
 MINIMAL_OUTPUT = True
 
 STOCKS = [
-    # {
-    #     'name': 'Apple',
-    #     'symbol': 'AAPL'
-    # },
-    # {
-    #     'name': 'Etsy',
-    #     'symbol': 'ETSY'
-    # },
-    # {
-    #     'name': 'Netflix',
-    #     'symbol': 'NFLX'
-    # },
-    # {
-    #     'name': 'Pinterest',
-    #     'symbol': 'PINS'
-    # },
-    # {
-    #     'name': 'Spotify',
-    #     'symbol': 'SPOT'
-    # },
-    # {
-    #     'name': 'Tesla',
-    #     'symbol': 'TSLA'
-    # },
-    # {
-    #     'name': 'Uber',
-    #     'symbol': 'U'
-    # },
-    {
-        'name': 'Wix.com',
-        'symbol': 'WIX'
-    },
-    # {
-    #     'name': 'Zoom',
-    #     'symbol': 'ZM'
-    # },
+    # { 'name': 'Adobe', 'symbol': 'ADBE' },
+    # { 'name': 'Airbnb', 'symbol': 'ABNB' },
+    # { 'name': 'AMD', 'symbol': 'AMD' },
+    # { 'name': 'Apple', 'symbol': 'AAPL' },
+    # { 'name': 'Asana', 'symbol': 'ASAN' },
+    # { 'name': 'Atlassian', 'symbol': 'TEAM' },
+    # { 'name': 'Autodesk', 'symbol': 'ADSK' },
+    # { 'name': 'Beyond Meat', 'symbol': 'BYND' },
+    # { 'name': 'BP', 'symbol': 'BP' },
+    # { 'name': 'Bumble', 'symbol': 'BMBL' },
+    # { 'name': 'Callaway', 'symbol': 'ELY' },
+    # { 'name': 'CAT', 'symbol': 'CAT' },
+    # { 'name': 'Chipolte', 'symbol': 'CMG' },
+    # { 'name': 'Coca Cola', 'symbol': 'KO' },
+    # { 'name': 'Dropbox', 'symbol': 'DBX' },
+    # { 'name': 'EA', 'symbol': 'EA' },
+    # { 'name': 'Ebay', 'symbol': 'EBAY' },
+    # { 'name': 'Etsy', 'symbol': 'ETSY' },
+    # { 'name': 'Facebook/Meta', 'symbol': 'FB' },
+    # { 'name': 'FedEx', 'symbol': 'FDX' },
+    # { 'name': 'Ferrari', 'symbol': 'RACE' },
+    # { 'name': 'Fiverr', 'symbol': 'FVRR' },
+    # { 'name': 'Ford', 'symbol': 'F' },
+    # { 'name': 'Garmin', 'symbol': 'GRMN' },
+    # { 'name': 'GM', 'symbol': 'GM' },
+    # { 'name': 'GoPro', 'symbol': 'GPRO' },
+    # { 'name': 'Hasbro', 'symbol': 'HAS' },
+    # { 'name': 'Honda', 'symbol': 'HMC' },
+    # { 'name': 'IBM', 'symbol': 'IBM' },
+    # { 'name': 'Intel', 'symbol': 'INTC' },
+    # { 'name': 'John Deere', 'symbol': 'DE' },
+    # { 'name': 'Johnson & Johnson', 'symbol': 'JNJ' },
+    # { 'name': 'Kelloggs', 'symbol': 'K' },
+    { 'name': 'Kodak', 'symbol': 'KODK' },
+    # { 'name': 'Logitec', 'symbol': 'LOGI' },
+    # { 'name': 'Manchester United', 'symbol': 'MANU' },
+    # { 'name': 'MasterCard', 'symbol': 'MA' },
+    # { 'name': 'McDonalds', 'symbol': 'MCD' },
+    # { 'name': 'Microsoft', 'symbol': 'MSFT' },
+    # { 'name': 'MongoDB', 'symbol': 'MDB' },
+    # { 'name': 'Monster', 'symbol': 'MNST' },
+    # { 'name': 'Netflix', 'symbol': 'NFLX' },
+    # { 'name': 'Nike', 'symbol': 'NKE' },
+    # { 'name': 'Nokia', 'symbol': 'NOK' },
+    # { 'name': 'Norton', 'symbol': 'NLOK' },
+    # { 'name': 'Nvidia', 'symbol': 'NVDA' },
+    # { 'name': 'PayPal', 'symbol': 'PYPL' },
+    # { 'name': 'Pfizer', 'symbol': 'PFE' },
+    # { 'name': 'Pinterest', 'symbol': 'PINS' },
+    # { 'name': 'Sony', 'symbol': 'SONY' },
+    # { 'name': 'Spotify', 'symbol': 'SPOT' },
+    # { 'name': 'Squarespace', 'symbol': 'SQSP' },
+    # { 'name': 'Tesla', 'symbol': 'TSLA' },
+    # { 'name': 'Toyota', 'symbol': 'TM' },
+    # { 'name': 'Trip Advisor', 'symbol': 'TRIP' },
+    # { 'name': 'Uber', 'symbol': 'UBER' },
+    # { 'name': 'Unity', 'symbol': 'U' },
+    # { 'name': 'UPS', 'symbol': 'UPS' },
+    # { 'name': 'Visa', 'symbol': 'V' },
+    # { 'name': 'Vodafone', 'symbol': 'VOD' },
+    # { 'name': 'Walmart', 'symbol': 'WMT' },
+    # { 'name': 'Walt Disney', 'symbol': 'DIS' },
+    # { 'name': 'Wish', 'symbol': 'WISH' },
+    # { 'name': 'Wix.com', 'symbol': 'WIX' },
+    # { 'name': 'WWE', 'symbol': 'WWE' },
+    # { 'name': 'Zoom', 'symbol': 'ZM' },
+    # { 'name': 'Zynga', 'symbol': 'ZNGA' },
 ]
 
 ##############################################################################################################################
 # GET THE DATA
 
 def run():
+    best_current_to_average_percentage = { 'symbol': '?', 'value': -999 }
+    print(f'Checking {len(STOCKS)} stocks...')
+
     for stock in STOCKS:
         data = {}
 
@@ -72,9 +106,12 @@ def run():
             response_data = request.json()
             sleep(13) # Alpha Vantage API only allows 5 calls per minute. So here we wait for a 5th of a minute
 
-            if 'Note' in response_data:
+            if 'Time Series (Daily)' in response_data:
+                data = response_data['Time Series (Daily)']
+            else:
+                print(url)
                 print(response_data)
-            data = response_data['Time Series (Daily)']
+                raise Exception("'Time Series (Daily)' was not found in the response object (see above)")
 
             # Remove all the other money values, we only want the "close" value
             for date in data:
@@ -124,9 +161,10 @@ def run():
         min_to_max_percentage = (max_value - min_value) / min_value * 100
         current_to_average_percentage = int((current - min_value) / min_value * 100)
         if current > average:
-            current_to_average_percentage = f'-{current_to_average_percentage}'
-        else:
-            current_to_average_percentage = f'{current_to_average_percentage}'
+            current_to_average_percentage = current_to_average_percentage * -1
+        if current_to_average_percentage > best_current_to_average_percentage['value']:
+            best_current_to_average_percentage['symbol'] = stock['symbol']
+            best_current_to_average_percentage['value'] = current_to_average_percentage
 
         ##############################################################################################################################
         # GRAPH THE RESULTS
@@ -178,5 +216,7 @@ def run():
         pyplot.legend() # Show a legend on the plot
         if SHOW_GRAPHS:
             pyplot.show() # Show the plot
+    
+    print(f"BEST CURRENT -> AVERGAGE: {best_current_to_average_percentage['symbol']}:{best_current_to_average_percentage['value']}" )
 
 run()

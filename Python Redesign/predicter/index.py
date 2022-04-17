@@ -16,8 +16,10 @@ TIME_SERIES_DAILY_FOLDER = os.path.join(root_folder, 'data', 'TIME_SERIES_DAILY'
 DATA_FROM = 'internet'
 # DATA_FROM = 'jsons'
 
+# SHOW_GRAPHS = True
 SHOW_GRAPHS = False
 MINIMAL_OUTPUT = True
+# MINIMAL_OUTPUT = False
 
 STOCKS = [
     { 'name': 'Adobe', 'symbol': 'ADBE' },
@@ -45,6 +47,7 @@ STOCKS = [
     { 'name': 'Ford', 'symbol': 'F' },
     { 'name': 'Garmin', 'symbol': 'GRMN' },
     { 'name': 'GM', 'symbol': 'GM' },
+    { 'name': 'Google', 'symbol': 'GOOGL' },
     { 'name': 'GoPro', 'symbol': 'GPRO' },
     { 'name': 'Hasbro', 'symbol': 'HAS' },
     { 'name': 'Honda', 'symbol': 'HMC' },
@@ -78,6 +81,7 @@ STOCKS = [
     { 'name': 'Uber', 'symbol': 'UBER' },
     { 'name': 'Unity', 'symbol': 'U' },
     { 'name': 'UPS', 'symbol': 'UPS' },
+    { 'name': 'Vanguard S&P 500 ETF', 'symbol': 'VOO' },
     { 'name': 'Visa', 'symbol': 'V' },
     { 'name': 'Vodafone', 'symbol': 'VOD' },
     { 'name': 'Walmart', 'symbol': 'WMT' },
@@ -93,15 +97,18 @@ STOCKS = [
 # GET THE DATA
 
 def run():
-    best_current_to_average_percentage = { 'symbol': '?', 'value': -999 }
-    print(f'Checking {len(STOCKS)} stocks...')
+    global STOCKS
+    total_stocks = len(STOCKS)
+    print(f'Checking {total_stocks} stocks...')
 
-    for stock in STOCKS:
+    # Collect the data
+    for index, stock in enumerate(STOCKS):
         data = {}
 
         # Get the data from the internet
         if DATA_FROM == 'internet':
             url = f"https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol={stock['symbol']}&outputsize=full&apikey=5719SGI5O6BMNFGM"
+            print(f"Fetching {stock['name']} ({index+1}/{total_stocks})")
             request = requests.get(url=url)
             response_data = request.json()
             sleep(13) # Alpha Vantage API only allows 5 calls per minute. So here we wait for a 5th of a minute
@@ -144,29 +151,25 @@ def run():
         min_value = 99999
         max_value = -99999
         cumilative_total = 0
-        current = None
+        stock['current'] = None
         for date in data:
             if date > start_date and date < end_date:
                 value = float(data[date])
                 graph_data[date] = value
                 cumilative_total += value
-                if not current:
-                    current = value
+                if not stock['current']:
+                    stock['current'] = value
                 if value > max_value:
                     max_value = value
                 if value < min_value:
                     min_value = value
 
-        mid = (max_value + min_value) / 2
-        average = cumilative_total / len(graph_data)
-        min_to_max_percentage = (max_value - min_value) / min_value * 100
-        current_to_average_percentage = (current - average) / average * 100
-        if current < average:
-            current_to_average_percentage = current_to_average_percentage * -1
-        if current_to_average_percentage > best_current_to_average_percentage['value']:
-            best_current_to_average_percentage['name'] = stock['name']
-            best_current_to_average_percentage['symbol'] = stock['symbol']
-            best_current_to_average_percentage['value'] = current_to_average_percentage
+        stock['mid'] = (max_value + min_value) / 2
+        stock['average'] = cumilative_total / len(graph_data)
+        stock['min_to_max_percentage'] = (max_value - min_value) / min_value * 100
+        stock['current_to_average_percentage'] = (stock['current'] - stock['average']) / stock['average'] * 100
+        if stock['current'] < stock['average']:
+            stock['current_to_average_percentage'] = stock['current_to_average_percentage'] * -1
 
         ##############################################################################################################################
         # GRAPH THE RESULTS
@@ -187,30 +190,12 @@ def run():
         pyplot.plot(x_values, y_values, label='Value')
 
         # Plot the Mid values
-        y_mid_values = [mid, mid]
+        y_mid_values = [stock['mid'], stock['mid']]
         pyplot.plot(start_end_dates, y_mid_values, label='Mid')
 
         # Plot the Avg values
-        average_values = [average, average]
+        average_values = [stock['average'], stock['average']]
         pyplot.plot(start_end_dates, average_values, label='Average')
-
-        # Just print info, since it is too much to show on the graph
-        print('-'*70)
-        print(f"{stock['name']}")
-        if not MINIMAL_OUTPUT:
-            print()
-            print(f'Start\t\t\t\t{start_date}')
-            print(f'End\t\t\t\t\t{end_date}')
-            print()
-            print(f'Current\t\t\t\t{current}')
-            print(f'Min\t\t\t\t\t{round(min_value, 2)}')
-            print(f'Max\t\t\t\t\t{round(max_value, 2)}')
-            print(f'Average\t\t\t\t{round(average, 2)}')
-            print()
-            print(f'Min -> Max\t\t\t{round(min_to_max_percentage, 2)}%')
-        print(f'Current -> Average\t{round(current_to_average_percentage, 2)}% (you want this to be above 20% or higher)')
-
-        # Labels x, y and title
         pyplot.xlabel('Date')
         pyplot.xticks(rotation=90)
         pyplot.ylabel('Stock Value')
@@ -219,7 +204,24 @@ def run():
         if SHOW_GRAPHS:
             pyplot.show() # Show the plot
 
-    print('='*70)
-    print(f"BEST CURRENT -> AVERGAGE:\n{best_current_to_average_percentage['name']}: {round(best_current_to_average_percentage['value'], 2)}%" )
+    # Print the data after sorting it by something
+    STOCKS = sorted(STOCKS, key=lambda d: d['current_to_average_percentage'])
+    STOCKS.reverse()
+    for stock in STOCKS:
+        # Just print info, since it is too much to show on the graph
+        print('-'*70)
+        print(f"{stock['name']}")
+        if not MINIMAL_OUTPUT:
+            print()
+            print(f"Start\t\t\t\t{start_date}")
+            print(f"End\t\t\t\t\t{end_date}")
+            print()
+            print(f"Current\t\t\t\t{stock['current']}")
+            print(f"Min\t\t\t\t\t{round(min_value, 2)}")
+            print(f"Max\t\t\t\t\t{round(max_value, 2)}")
+            print(f"Average\t\t\t\t{round(stock['average'], 2)}")
+            print()
+            print(f"Min -> Max\t\t\t{round(stock['min_to_max_percentage'], 2)}%")
+        print(f"Current -> Average\t{round(stock['current_to_average_percentage'], 2)}% (you want this to be above 20% or higher)")
 
 run()

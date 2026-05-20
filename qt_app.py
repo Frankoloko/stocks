@@ -8,6 +8,71 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.patches import Rectangle
 
 
+# -----------------------------
+# TRENDLINE COMPUTATION
+# -----------------------------
+def compute_trendlines(candles):
+    """
+    Find upward trendlines touching two Low wicks.
+
+    Rules:
+      - Only bottom wicks (Low values) are used as touch points.
+      - Line must angle upward: Low[B] > Low[A].
+      - At least one candle must exist between A and B (B >= A + 2).
+      - No candle between A and B may have its Low below the trendline
+        at that index (line is not violated underneath between touch points).
+      - After a line A→B is accepted, the next line's start point must
+        be at index >= B (A cannot be reused as a start for another line).
+
+    Returns a list of (i, j) index pairs for accepted trendlines.
+    """
+    n = len(candles)
+    lows = [float(c["Low"]) for c in candles]
+
+    lines = []       # accepted (A, B) pairs
+    min_next_start = 0  # earliest index the next line's A can be
+
+    # Walk through every possible A
+    a = 0
+    while a < n - 2:
+        if a < min_next_start:
+            a += 1
+            continue
+
+        nearest_b = None
+
+        # Find the nearest valid B for this A (earliest legitimate trendline)
+        for b in range(a + 2, n):
+            low_a = lows[a]
+            low_b = lows[b]
+
+            # Must angle upward
+            if low_b <= low_a:
+                continue
+
+            # Check no candle between A and B dips below the trendline
+            slope = (low_b - low_a) / (b - a)
+            valid = True
+            for k in range(a + 1, b):
+                line_price = low_a + slope * (k - a)
+                if lows[k] < line_price:
+                    valid = False
+                    break
+
+            if valid:
+                nearest_b = b
+                break  # take the earliest valid B, not the furthest
+
+        if nearest_b is not None:
+            lines.append((a, nearest_b))
+            min_next_start = nearest_b  # next line's A must start at nearest_b or later
+            a = nearest_b               # advance A past this line's B
+        else:
+            a += 1
+
+    return lines
+
+
 class CandleViewer(QMainWindow):
     def __init__(self, json_path):
         super().__init__()
@@ -37,6 +102,11 @@ class CandleViewer(QMainWindow):
 
         self.global_min = min(all_prices)
         self.global_max = max(all_prices)
+
+        # -----------------------------
+        # PRE-COMPUTE ALL TRENDLINES
+        # -----------------------------
+        self.trendlines = compute_trendlines(self.candles)
 
         # -----------------------------
         # UI SETUP
@@ -84,6 +154,8 @@ class CandleViewer(QMainWindow):
             self.canvas.draw()
             return
 
+        lows = [float(c["Low"]) for c in self.candles]
+
         for i, c in enumerate(visible):
             o = float(c["Open"])
             h = float(c["High"])
@@ -92,7 +164,7 @@ class CandleViewer(QMainWindow):
 
             color = "green" if cl >= o else "red"
 
-            # wick (same color as candle)
+            # wick
             self.ax.plot(
                 [i, i],
                 [l, h],
@@ -111,6 +183,46 @@ class CandleViewer(QMainWindow):
                 color=color
             )
             self.ax.add_patch(rect)
+
+        # -----------------------------
+        # DRAW TRENDLINES
+        # Trendline is visible only when both its touch points (A and B)
+        # have been revealed. The line is extended rightward to the current
+        # visible index so you can see it projecting forward.
+        # -----------------------------
+        for (a, b) in self.trendlines:
+            # Both touch points must be visible
+            if b >= self.index:
+                continue
+
+            low_a = lows[a]
+            low_b = lows[b]
+            slope = (low_b - low_a) / (b - a)
+
+            # Extend line from A to the rightmost visible candle
+            x_end = self.index - 1
+            y_start = low_a
+            y_end = low_a + slope * (x_end - a)
+
+            self.ax.plot(
+                [a, x_end],
+                [y_start, y_end],
+                color="dodgerblue",
+                linewidth=1.5,
+                linestyle="--",
+                alpha=0.85,
+                zorder=3
+            )
+
+            # Mark the two touch points with small dots
+            self.ax.plot(
+                [a, b],
+                [low_a, low_b],
+                "o",
+                color="dodgerblue",
+                markersize=4,
+                zorder=4
+            )
 
         # -----------------------------
         # FIXED AXIS (NO ZOOMING)

@@ -4,257 +4,218 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QFi
 from PyQt5.QtCore import Qt
 
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.patches import Rectangle
 
 
-# -----------------------------
-# TRENDLINE COMPUTATION
-# -----------------------------
-def compute_trendlines(candles):
+def compute_mas(closes, period):
+    """Simple moving average. Returns list of None (warmup) then floats."""
+    mas = []
+    for i in range(len(closes)):
+        if i < period - 1:
+            mas.append(None)
+        else:
+            mas.append(sum(closes[i - period + 1:i + 1]) / period)
+    return mas
+
+
+def compute_trades(closes, ma5, ma50):
     """
-    Find upward trendlines touching two Low wicks.
-
-    Rules:
-      - Only bottom wicks (Low values) are used as touch points.
-      - Line must angle upward: Low[B] > Low[A].
-      - At least one candle must exist between A and B (B >= A + 2).
-      - No candle between A and B may have its Low below the trendline
-        at that index (line is not violated underneath between touch points).
-      - After a line A→B is accepted, the next line's start point must
-        be at index >= B (A cannot be reused as a start for another line).
-
-    Returns a list of (i, j) index pairs for accepted trendlines.
+    Buy  when ma5 crosses above ma50 (was below, now above).
+    Sell when ma5 crosses back below ma50 (was above, now below).
     """
-    n = len(candles)
-    lows = [float(c["Low"]) for c in candles]
+    trades = []
+    in_trade = False
+    entry_idx = None
 
-    lines = []       # accepted (A, B) pairs
-    min_next_start = 0  # earliest index the next line's A can be
-
-    # Walk through every possible A
-    a = 0
-    while a < n - 2:
-        if a < min_next_start:
-            a += 1
+    for i in range(1, len(closes)):
+        if ma5[i] is None or ma50[i] is None:
+            continue
+        if ma5[i - 1] is None or ma50[i - 1] is None:
             continue
 
-        nearest_b = None
+        was_above = ma5[i - 1] > ma50[i - 1]
+        is_above  = ma5[i]     > ma50[i]
 
-        # Find the nearest valid B for this A (earliest legitimate trendline)
-        for b in range(a + 2, n):
-            low_a = lows[a]
-            low_b = lows[b]
+        if not in_trade and not was_above and is_above:
+            # Golden cross — buy
+            in_trade  = True
+            entry_idx = i
 
-            # Must angle upward
-            if low_b <= low_a:
-                continue
+        elif in_trade and was_above and not is_above:
+            # Death cross — sell
+            trades.append({'entry': entry_idx, 'exit': i})
+            in_trade  = False
+            entry_idx = None
 
-            # Check no candle between A and B dips below the trendline
-            slope = (low_b - low_a) / (b - a)
-            valid = True
-            for k in range(a + 1, b):
-                line_price = low_a + slope * (k - a)
-                if lows[k] < line_price:
-                    valid = False
-                    break
+    # Close any open trade at last candle
+    if in_trade:
+        trades.append({'entry': entry_idx, 'exit': len(closes) - 1, 'open': True})
 
-            if valid:
-                nearest_b = b
-                break  # take the earliest valid B, not the furthest
-
-        if nearest_b is not None:
-            lines.append((a, nearest_b))
-            min_next_start = nearest_b  # next line's A must start at nearest_b or later
-            a = nearest_b               # advance A past this line's B
-        else:
-            a += 1
-
-    return lines
+    return trades
 
 
 class CandleViewer(QMainWindow):
     def __init__(self, json_path):
         super().__init__()
+        self.setWindowTitle("MA5 / MA50 Crossover")
+        self.setGeometry(100, 100, 1400, 750)
 
-        self.setWindowTitle("Candle Step Viewer")
-        self.setGeometry(100, 100, 1200, 700)
-
-        # -----------------------------
-        # LOAD DATA
-        # -----------------------------
-        with open(json_path, "r") as f:
+        with open(json_path) as f:
             self.candles = json.load(f)
 
-        self.index = 0
+        self.n      = len(self.candles)
+        self.index  = 0
 
-        # -----------------------------
-        # PRE-COMPUTE GLOBAL PRICE RANGE
-        # -----------------------------
-        all_prices = []
-        for c in self.candles:
-            all_prices.extend([
-                float(c["Open"]),
-                float(c["High"]),
-                float(c["Low"]),
-                float(c["Close"])
-            ])
+        self.opens  = [float(c["Open"])  for c in self.candles]
+        self.highs  = [float(c["High"])  for c in self.candles]
+        self.lows   = [float(c["Low"])   for c in self.candles]
+        self.closes = [float(c["Close"]) for c in self.candles]
 
+        self.ma5  = compute_mas(self.closes, 5)
+        self.ma50 = compute_mas(self.closes, 50)
+        self.trades = compute_trades(self.closes, self.ma5, self.ma50)
+
+        all_prices = self.opens + self.highs + self.lows + self.closes
         self.global_min = min(all_prices)
         self.global_max = max(all_prices)
 
-        # -----------------------------
-        # PRE-COMPUTE ALL TRENDLINES
-        # -----------------------------
-        self.trendlines = compute_trendlines(self.candles)
-
-        # -----------------------------
-        # UI SETUP
-        # -----------------------------
         self.main_widget = QWidget()
         self.setCentralWidget(self.main_widget)
         layout = QVBoxLayout(self.main_widget)
 
-        self.fig, self.ax = plt.subplots()
+        self.fig, self.ax = plt.subplots(figsize=(14, 7))
         self.canvas = FigureCanvas(self.fig)
         layout.addWidget(self.canvas)
 
-        # -----------------------------
-        # FIX: PREVENT 0–1 AUTO SCALE ON START
-        # -----------------------------
-        self.ax.set_xlim(-1, len(self.candles) + 1)
-        self.ax.set_ylim(self.global_min * 0.999, self.global_max * 1.001)
+        self.ax.set_xlim(-1, self.n + 1)
+        self.ax.set_ylim(self.global_min * 0.998, self.global_max * 1.002)
         self.ax.autoscale(False)
 
         self.draw_chart()
 
-    # -----------------------------
-    # KEYBOARD CONTROL
-    # -----------------------------
     def keyPressEvent(self, event):
-        if event.key() == Qt.Key_Right:
-            if self.index < len(self.candles):
-                self.index += 1
-                self.draw_chart()
+        if event.key() == Qt.Key_Right and self.index < self.n:
+            self.index += 1
+            self.draw_chart()
+        elif event.key() == Qt.Key_Left and self.index > 0:
+            self.index -= 1
+            self.draw_chart()
 
-        elif event.key() == Qt.Key_Left:
-            if self.index > 0:
-                self.index -= 1
-                self.draw_chart()
-
-    # -----------------------------
-    # DRAW CANDLES
-    # -----------------------------
     def draw_chart(self):
         self.ax.clear()
 
-        visible = self.candles[:self.index]
+        price_range  = self.global_max - self.global_min
+        arrow_offset = price_range * 0.012
 
-        if not visible:
-            self.canvas.draw()
-            return
+        # ── Candles ──────────────────────────────────────────────────────────
+        for i in range(self.index):
+            o  = self.opens[i]
+            h  = self.highs[i]
+            l  = self.lows[i]
+            cl = self.closes[i]
+            color = "#26a69a" if cl >= o else "#ef5350"
 
-        lows = [float(c["Low"]) for c in self.candles]
+            self.ax.plot([i, i], [l, h], color=color, linewidth=1, zorder=2)
+            body_h = abs(cl - o) or 0.001
+            self.ax.add_patch(Rectangle(
+                (i - 0.3, min(o, cl)), 0.6, body_h, color=color, zorder=2
+            ))
 
-        for i, c in enumerate(visible):
-            o = float(c["Open"])
-            h = float(c["High"])
-            l = float(c["Low"])
-            cl = float(c["Close"])
+        # ── MA lines ─────────────────────────────────────────────────────────
+        xs5,  ys5  = [], []
+        xs50, ys50 = [], []
+        for i in range(self.index):
+            if self.ma5[i] is not None:
+                xs5.append(i);  ys5.append(self.ma5[i])
+            if self.ma50[i] is not None:
+                xs50.append(i); ys50.append(self.ma50[i])
 
-            color = "green" if cl >= o else "red"
+        if xs5:
+            self.ax.plot(xs5,  ys5,  color='#FFD600', linewidth=1.4,
+                         zorder=3, label='MA 5')
+        if xs50:
+            self.ax.plot(xs50, ys50, color='#42A5F5', linewidth=1.8,
+                         zorder=3, label='MA 50')
 
-            # wick
-            self.ax.plot(
-                [i, i],
-                [l, h],
-                color=color,
-                linewidth=1
-            )
+        # ── Trades ───────────────────────────────────────────────────────────
+        for trade in self.trades:
+            entry = trade['entry']
+            exit_ = trade['exit']
+            is_open = trade.get('open', False)
 
-            # body
-            body_bottom = min(o, cl)
-            body_height = abs(cl - o)
-
-            rect = Rectangle(
-                (i - 0.3, body_bottom),
-                0.6,
-                body_height if body_height != 0 else 0.001,
-                color=color
-            )
-            self.ax.add_patch(rect)
-
-        # -----------------------------
-        # DRAW TRENDLINES
-        # Trendline is visible only when both its touch points (A and B)
-        # have been revealed. The line is extended rightward to the current
-        # visible index so you can see it projecting forward.
-        # -----------------------------
-        for (a, b) in self.trendlines:
-            # Both touch points must be visible
-            if b >= self.index:
+            if entry >= self.index:
                 continue
 
-            low_a = lows[a]
-            low_b = lows[b]
-            slope = (low_b - low_a) / (b - a)
-
-            # Extend line from A to the rightmost visible candle
-            x_end = self.index - 1
-            y_start = low_a
-            y_end = low_a + slope * (x_end - a)
-
-            self.ax.plot(
-                [a, x_end],
-                [y_start, y_end],
-                color="dodgerblue",
-                linewidth=1.5,
-                linestyle="--",
-                alpha=0.85,
-                zorder=3
+            # Entry arrow
+            ep = self.closes[entry]
+            self.ax.annotate(
+                '▲ BUY',
+                xy=(entry, ep - arrow_offset),
+                xytext=(entry, ep - arrow_offset * 3.5),
+                fontsize=7.5, color='#00E676', fontweight='bold',
+                ha='center', va='top',
+                arrowprops=dict(arrowstyle='->', color='#00E676', lw=1.5),
+                zorder=5
             )
 
-            # Mark the two touch points with small dots
-            self.ax.plot(
-                [a, b],
-                [low_a, low_b],
-                "o",
-                color="dodgerblue",
-                markersize=4,
-                zorder=4
-            )
+            # Exit arrow (only once the exit candle is visible)
+            if exit_ < self.index:
+                xp    = self.closes[exit_]
+                label = '▼ HOLD' if is_open else '▼ SELL'
+                color = '#aaaaaa' if is_open else '#FFD600'
+                self.ax.annotate(
+                    label,
+                    xy=(exit_, xp + arrow_offset),
+                    xytext=(exit_, xp + arrow_offset * 3.5),
+                    fontsize=7.5, color=color, fontweight='bold',
+                    ha='center', va='bottom',
+                    arrowprops=dict(arrowstyle='->', color=color, lw=1.5),
+                    zorder=5
+                )
 
-        # -----------------------------
-        # FIXED AXIS (NO ZOOMING)
-        # -----------------------------
-        self.ax.set_xlim(-1, len(self.candles) + 1)
-        self.ax.set_ylim(self.global_min * 0.999, self.global_max * 1.001)
-
-        self.ax.set_title(f"Candles: {self.index}/{len(self.candles)}")
-        self.ax.set_xlabel("Index")
+        # ── Axis / style ──────────────────────────────────────────────────────
+        self.ax.set_xlim(-1, self.n + 1)
+        self.ax.set_ylim(self.global_min * 0.998, self.global_max * 1.002)
+        self.ax.set_title(
+            f"MA5 × MA50 Crossover — Candle {self.index}/{self.n}  (← → to step)",
+            fontsize=11
+        )
+        self.ax.set_xlabel("Candle Index")
         self.ax.set_ylabel("Price")
+        self.ax.set_facecolor('#0d1117')
+        self.fig.patch.set_facecolor('#0d1117')
+        self.ax.tick_params(colors='#aaaaaa')
+        self.ax.xaxis.label.set_color('#aaaaaa')
+        self.ax.yaxis.label.set_color('#aaaaaa')
+        self.ax.title.set_color('#dddddd')
+        for spine in self.ax.spines.values():
+            spine.set_edgecolor('#333333')
+
+        handles = [
+            mpatches.Patch(color='#FFD600', label='MA 5'),
+            mpatches.Patch(color='#42A5F5', label='MA 50'),
+            mpatches.Patch(color='#00E676', label='Buy (MA5 crosses above MA50)'),
+            mpatches.Patch(color='#FFD600', label='Sell (MA5 crosses below MA50)'),
+        ]
+        self.ax.legend(handles=handles, loc='upper left', fontsize=8,
+                       facecolor='#1a1a2e', edgecolor='#444',
+                       labelcolor='#cccccc')
 
         self.canvas.draw()
 
 
-# -----------------------------
-# RUN APP
-# -----------------------------
 if __name__ == "__main__":
     app = QApplication(sys.argv)
 
     file_path, _ = QFileDialog.getOpenFileName(
-        None,
-        "Select Candle JSON File",
-        "",
-        "JSON Files (*.json)"
+        None, "Select Candle JSON File", "", "JSON Files (*.json)"
     )
-
     if not file_path:
         print("No file selected.")
         sys.exit()
 
     window = CandleViewer(file_path)
     window.show()
-
     sys.exit(app.exec_())

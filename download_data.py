@@ -2,7 +2,7 @@ import yfinance as yf
 import os
 import json
 
-def download_stock_data(symbols, interval="1h", period="1mo"):
+def download_stock_data(symbols, interval="1h", period="1mo", start=None, end=None):
     folder_name = f"{interval}_{period}"
     base_path = os.path.join("data", folder_name)
     os.makedirs(base_path, exist_ok=True)
@@ -14,7 +14,9 @@ def download_stock_data(symbols, interval="1h", period="1mo"):
             symbol,
             interval=interval,
             period=period,
-            progress=False
+            progress=False,
+            start=start,
+            end=end,
         )
 
         if data.empty:
@@ -38,9 +40,31 @@ def download_stock_data(symbols, interval="1h", period="1mo"):
 
 
 if __name__ == "__main__":
-    symbols = ["AAPL", "MSFT", "TSLA"]
+    symbols = [
+        "SHOP.TO",
+        "CLS.TO",
+        "ATD.TO",
+        "BN.TO",
+        "CJT.TO",
+        "LSPD.TO",
+        "CSU.TO",
+        "WSP.TO",
+        "IFC.TO",
+        "GSY.TO",
+        "EQB.TO",
+        "CCO.TO",
+        "NTR.TO",
+        "CVE.TO",
+        "TRI.TO",
+        "OTEX.TO",
+        "DOL.TO",
+        "ENB.TO",
+    ]
 
-    interval = "4h"
-    period = "3mo"
+    interval = "1m"
+    period = "8d"
+    start = None
+    # end = "2026-04-21"
+    end = None
 
-    download_stock_data(symbols, interval, period)
+    download_stock_data(symbols, interval, period, start, end)
